@@ -1,4 +1,4 @@
-package com.ettlinger.wearrecorder
+package ai.etti.clawhark
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -20,7 +20,9 @@ import android.os.BatteryManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
+import android.content.ComponentName
 import android.telephony.TelephonyManager
+import androidx.wear.watchface.complications.datasource.ComplicationDataSourceUpdateRequester
 import androidx.work.Constraints
 import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.ExistingWorkPolicy
@@ -28,6 +30,8 @@ import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
+import java.util.Timer
+import java.util.TimerTask
 import kotlinx.coroutines.*
 import java.io.File
 import java.text.SimpleDateFormat
@@ -40,6 +44,39 @@ class RecordingService : Service() {
         const val TAG = "Service"
         const val CHANNEL_ID = "clawhark_channel"
         const val NOTIFICATION_ID = 1
+
+        private val LISTENING_WORDS = listOf(
+            "Listening...",
+            "All ears...",
+            "Tuned in...",
+            "Absorbing...",
+            "Catching every word...",
+            "Picking up signals...",
+            "Ears perked...",
+            "Harkening...",
+            "Soaking it in...",
+            "Attuned...",
+            "Capturing the moment...",
+            "Taking it all in...",
+            "Standing by...",
+            "Monitoring...",
+            "Dialed in...",
+            "Zeroed in...",
+            "Keeping tabs...",
+            "Clocking everything...",
+            "Locked on...",
+            "Receiving...",
+            "Hanging on every word...",
+            "Quietly observing...",
+            "Ears to the ground...",
+            "On standby...",
+            "Paying attention...",
+            "In the loop...",
+            "Registering...",
+            "Noting everything...",
+            "Hearing you out...",
+            "Switched on...",
+        )
         const val SAMPLE_RATE = 16000
         const val CHUNK_DURATION_MS = 15 * 60 * 1000L // 15 minutes
         const val VAD_THRESHOLD = 500
@@ -64,6 +101,8 @@ class RecordingService : Service() {
     private val binder = LocalBinder()
     @Volatile private var audioRecord: AudioRecord? = null
     @Volatile private var isRecording = false
+    private var wordTimer: Timer? = null
+    private var currentWordIndex = (0 until LISTENING_WORDS.size).random()
     @Volatile private var wakeLock: PowerManager.WakeLock? = null
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var recordJob: Job? = null
@@ -185,12 +224,31 @@ class RecordingService : Service() {
         val intent = Intent(this, MainActivity::class.java)
         val pending = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
         return Notification.Builder(this, CHANNEL_ID)
-            .setContentTitle("Recording")
-            .setContentText("Listening...")
+            .setContentTitle("ClawHark")
+            .setContentText(LISTENING_WORDS[currentWordIndex])
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pending)
             .setOngoing(true)
             .build()
+    }
+
+    private fun startWordRotation() {
+        wordTimer?.cancel()
+        wordTimer = Timer("word-rotation", true).apply {
+            scheduleAtFixedRate(object : TimerTask() {
+                override fun run() {
+                    currentWordIndex = (currentWordIndex + 1) % LISTENING_WORDS.size
+                    val nm = getSystemService(NotificationManager::class.java)
+                    nm.notify(NOTIFICATION_ID, createNotification())
+                    AppLog.d(TAG, "Notification: ${LISTENING_WORDS[currentWordIndex]}")
+                }
+            }, 2 * 60 * 60 * 1000L, 2 * 60 * 60 * 1000L) // every 2 hours
+        }
+    }
+
+    private fun stopWordRotation() {
+        wordTimer?.cancel()
+        wordTimer = null
     }
 
     private fun startRecording() {
@@ -236,6 +294,9 @@ class RecordingService : Service() {
 
         isRecording = true
         recordingStartTime = System.currentTimeMillis()
+        currentWordIndex = (0 until LISTENING_WORDS.size).random()
+        startWordRotation()
+        updateComplication()
 
         val pm = getSystemService(POWER_SERVICE) as PowerManager
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "ClawHark::Recording").apply {
@@ -292,6 +353,8 @@ class RecordingService : Service() {
         }
         AppLog.i(TAG, "=== STOPPING RECORDING ===")
         isRecording = false
+        stopWordRotation()
+        updateComplication()
         // recordLoop detects isRecording=false, finalizes encoder, and cleans up AudioRecord + wake lock
         // Cancel periodic uploads (no longer producing files) and trigger one final upload
         val wm = WorkManager.getInstance(this)
@@ -851,4 +914,15 @@ class RecordingService : Service() {
     }
 
     fun getStorageUsed(): Long = getRecordings().sumOf { it.length() }
+
+    private fun updateComplication() {
+        try {
+            ComplicationDataSourceUpdateRequester.create(
+                this,
+                ComponentName(this, RecordingComplicationService::class.java)
+            ).requestUpdateAll()
+        } catch (e: Exception) {
+            AppLog.d(TAG, "Complication update failed (may not be on watch face): ${e.message}")
+        }
+    }
 }

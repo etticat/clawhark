@@ -52,5 +52,28 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <receiver
+            android:name=".ComplicationToggleReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="ai.etti.clawhark.TOGGLE_RECORDING" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name=".RecordingComplicationService"
+            android:exported="true"
+            android:permission="com.google.android.wearable.permission.BIND_COMPLICATION_PROVIDER">
+            <intent-filter>
+                <action android:name="android.support.wearable.complications.ACTION_COMPLICATION_UPDATE_REQUEST" />
+            </intent-filter>
+            <meta-data
+                android:name="android.support.wearable.complications.SUPPORTED_TYPES"
+                android:value="SHORT_TEXT,RANGED_VALUE" />
+            <meta-data
+                android:name="android.support.wearable.complications.UPDATE_PERIOD_SECONDS"
+                android:value="900" />
+        </service>
     </application>
 </manifest>

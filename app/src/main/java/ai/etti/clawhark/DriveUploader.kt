@@ -1,4 +1,4 @@
-package com.ettlinger.wearrecorder
+package ai.etti.clawhark
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

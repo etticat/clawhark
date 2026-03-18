@@ -1,4 +1,4 @@
-package com.ettlinger.wearrecorder
+package ai.etti.clawhark
 
 import android.content.BroadcastReceiver
 import android.content.Context

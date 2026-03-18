@@ -1,10 +1,12 @@
-package com.ettlinger.wearrecorder
+package ai.etti.clawhark
 
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKeys
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -128,8 +130,29 @@ object AuthManager {
     }
 
     fun clearAuth() {
+        val refreshToken = requirePrefs().getString(PREF_REFRESH_TOKEN, null)
         requirePrefs().edit().clear().apply()
         AppLog.i(TAG, "Auth cleared")
+
+        // Revoke refresh token at Google so it can't be reused if previously extracted
+        if (refreshToken != null) {
+            GlobalScope.launch(Dispatchers.IO) {
+                try {
+                    val conn = URL("https://oauth2.googleapis.com/revoke?token=$refreshToken")
+                        .openConnection() as HttpURLConnection
+                    conn.requestMethod = "POST"
+                    conn.connectTimeout = CONNECT_TIMEOUT
+                    conn.readTimeout = READ_TIMEOUT
+                    conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+                    conn.outputStream.close()
+                    val code = conn.responseCode
+                    AppLog.i(TAG, "Token revocation HTTP $code")
+                    conn.disconnect()
+                } catch (e: Exception) {
+                    AppLog.w(TAG, "Token revocation failed (non-critical): ${e.message}")
+                }
+            }
+        }
     }
 
     /** Invalidate cached access token (call on 401 from API) */

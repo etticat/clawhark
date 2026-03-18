@@ -13,9 +13,9 @@ if [ ! -f "$CREDS_FILE" ]; then
   exit 1
 fi
 
-CLIENT_ID=$(python3 -c "import json; print(json.load(open('$CREDS_FILE'))['client_id'])")
-CLIENT_SECRET=$(python3 -c "import json; print(json.load(open('$CREDS_FILE'))['client_secret'])")
-REFRESH_TOKEN=$(python3 -c "import json; print(json.load(open('$CREDS_FILE'))['refresh_token'])")
+CLIENT_ID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['client_id'])" "$CREDS_FILE")
+CLIENT_SECRET=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['client_secret'])" "$CREDS_FILE")
+REFRESH_TOKEN=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['refresh_token'])" "$CREDS_FILE")
 
 # Get access token
 ACCESS_TOKEN=$(curl -sf -X POST https://oauth2.googleapis.com/token \

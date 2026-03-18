@@ -28,9 +28,10 @@ ClawHark is an open-source audio recording app for Wear OS. It records audio on 
 
 ## Data Storage & Transfer
 
-1. **On-device:** Audio is recorded as WAV files and stored temporarily on the watch
+1. **On-device:** Audio is recorded as AAC files (M4A container) and stored temporarily on the watch. A local log file (`clawhark.log`) records app activity metadata (timestamps, upload status) but not audio content.
 2. **Google Drive:** Files are uploaded to a "ClawHark" folder in your Google Drive using the `drive.file` scope (the app can only access files it created — it cannot read your other Drive files)
-3. **Auto-cleanup:** Local files are deleted after successful upload
+3. **Auto-cleanup:** Local files are deleted after successful upload. Local storage is capped at 500 MB with oldest files removed first.
+4. **Auto-restart:** If you have signed in and started recording, the app will automatically resume recording after a device reboot.
 
 All data transfer uses HTTPS encryption. Audio files are not encrypted at rest on the watch or in Drive.
 
